@@ -180,16 +180,22 @@ class Stripe_ApiRequestor
     $params = self::_encodeObjects($params);
     $langVersion = phpversion();
     $uname = php_uname();
-    $ua = array('bindings_version' => Stripe::VERSION,
-                'lang' => 'php',
-                'lang_version' => $langVersion,
-                'publisher' => 'stripe',
-                'uname' => $uname);
-    $headers = array('X-Stripe-Client-User-Agent: ' . json_encode($ua),
-                     'User-Agent: Stripe/v1 PhpBindings/' . Stripe::VERSION,
-                     'Authorization: Bearer ' . $myApiKey);
-    if (Stripe::$apiVersion)
+    $ua = array(
+        'bindings_version' => Stripe::VERSION,
+        'lang' => 'php',
+        'lang_version' => $langVersion,
+        'publisher' => 'stripe',
+        'uname' => $uname,
+    );
+    $headers = array(
+        'X-Stripe-Client-User-Agent: ' . json_encode($ua),
+        'User-Agent: Stripe/v1 PhpBindings/' . Stripe::VERSION,
+        'Authorization: Bearer ' . $myApiKey,
+        'Content-Type: application/x-www-form-urlencoded',
+    );
+    if (Stripe::$apiVersion) {
       $headers[] = 'Stripe-Version: ' . Stripe::$apiVersion;
+    }
     list($rbody, $rcode) = $this->_curlRequest(
         $method,
         $absUrl,
@@ -369,7 +375,7 @@ class Stripe_ApiRequestor
     if ($errno !== 0) {
       $apiBase = Stripe::$apiBase;
       throw new Stripe_ApiConnectionError(
-          'Could not connect to Stripe ($apiBase).  Please check your '.
+          'Could not connect to Stripe (' . $apiBase . ').  Please check your '.
           'internet connection and try again.  If this problem persists, '.
           'you should check Stripe\'s service status at '.
           'https://twitter.com/stripestatus. Reason was: '.$errstr
