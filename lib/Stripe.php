@@ -2,6 +2,11 @@
 
 namespace Stripe;
 
+/**
+ * Class Stripe
+ *
+ * @package Stripe
+ */
 class Stripe
 {
     // @var string The Stripe API key to be used for requests.
@@ -16,10 +21,13 @@ class Stripe
     // @var string|null The version of the Stripe API to use for requests.
     public static $apiVersion = null;
 
+    // @var string|null The account ID for connected accounts requests.
+    public static $accountId = null;
+
     // @var boolean Defaults to true.
     public static $verifySslCerts = true;
 
-    const VERSION = '2.1.1';
+    const VERSION = '3.21.0';
 
     /**
      * @return string The API key used for requests.
@@ -70,5 +78,23 @@ class Stripe
     public static function setVerifySslCerts($verify)
     {
         self::$verifySslCerts = $verify;
+    }
+
+    /**
+     * @return string | null The Stripe account ID for connected account
+     *   requests.
+     */
+    public static function getAccountId()
+    {
+        return self::$accountId;
+    }
+
+    /**
+     * @param string $accountId The Stripe account ID to set for connected
+     *   account requests.
+     */
+    public static function setAccountId($accountId)
+    {
+        self::$accountId = $accountId;
     }
 }

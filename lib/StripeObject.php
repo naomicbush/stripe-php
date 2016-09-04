@@ -5,7 +5,12 @@ namespace Stripe;
 use ArrayAccess;
 use InvalidArgumentException;
 
-class Object implements ArrayAccess
+/**
+ * Class StripeObject
+ *
+ * @package Stripe
+ */
+class StripeObject implements ArrayAccess, JsonSerializable
 {
     /**
      * @var Util\Set Attributes that should not be sent to the API because
@@ -21,7 +26,31 @@ class Object implements ArrayAccess
     public static function init()
     {
         self::$permanentAttributes = new Util\Set(array('_opts', 'id'));
-        self::$nestedUpdatableAttributes = new Util\Set(array('metadata'));
+        self::$nestedUpdatableAttributes = new Util\Set(array(
+            'metadata', 'legal_entity', 'address', 'dob', 'transfer_schedule', 'verification',
+            'tos_acceptance', 'personal_address',
+            // will make the array into an AttachedObject: weird, but works for now
+            'additional_owners', 0, 1, 2, 3, 4, // Max 3, but leave the 4th so errors work properly
+            'inventory'
+        ));
+    }
+
+    /**
+     * @return object The last response from the Stripe API
+     */
+    public function getLastResponse()
+    {
+        return $this->_lastResponse;
+    }
+
+    /**
+     * @param ApiResponse
+     *
+     * @return void Set the last response from the Stripe API
+     */
+    public function setLastResponse($resp)
+    {
+        $this->_lastResponse = $resp;
     }
 
     protected $_opts;
@@ -29,6 +58,7 @@ class Object implements ArrayAccess
     protected $_unsavedValues;
     protected $_transientValues;
     protected $_retrieveOptions;
+    protected $_lastResponse;
 
     public function __construct($id = null, $opts = null)
     {
@@ -64,7 +94,7 @@ class Object implements ArrayAccess
         }
 
         if (self::$nestedUpdatableAttributes->includes($k)
-                && isset($this->$k) && is_array($v)) {
+                && isset($this->$k) && $this->$k instanceof AttachedObject && is_array($v)) {
             $this->$k->replaceWith($v);
         } else {
             // TODO: may want to clear from $_transientValues (Won't be user-visible).
@@ -85,11 +115,13 @@ class Object implements ArrayAccess
         $this->_transientValues->add($k);
         $this->_unsavedValues->discard($k);
     }
-    public function __get($k)
+    public function &__get($k)
     {
-        if (array_key_exists($k, $this->_values)) {
+        // function should return a reference, using $nullval to return a reference to null
+        $nullval = null;
+        if (!empty($this->_values) && array_key_exists($k, $this->_values)) {
             return $this->_values[$k];
-        } else if ($this->_transientValues->includes($k)) {
+        } else if (!empty($this->_transientValues) && $this->_transientValues->includes($k)) {
             $class = get_class($this);
             $attrs = join(', ', array_keys($this->_values));
             $message = "Stripe Notice: Undefined property of $class instance: $k. "
@@ -99,11 +131,11 @@ class Object implements ArrayAccess
                     . "probably as a result of a save(). The attributes currently "
                     . "available on this object are: $attrs";
             error_log($message);
-            return null;
+            return $nullval;
         } else {
             $class = get_class($this);
             error_log("Stripe Notice: Undefined property of $class instance: $k");
-            return null;
+            return $nullval;
         }
     }
 
@@ -138,7 +170,7 @@ class Object implements ArrayAccess
      * @param array $values
      * @param array $opts
      *
-     * @return Object The object constructed from the given values.
+     * @return StripeObject The object constructed from the given values.
      */
     public static function constructFrom($values, $opts)
     {
@@ -151,11 +183,15 @@ class Object implements ArrayAccess
      * Refreshes this object using the provided values.
      *
      * @param array $values
-     * @param array $opts
+     * @param array|Util\RequestOptions $opts
      * @param boolean $partial Defaults to false.
      */
     public function refreshFrom($values, $opts, $partial = false)
     {
+        if (is_array($opts)) {
+            $opts = Util\RequestOptions::parse($opts);
+        }
+
         $this->_opts = $opts;
 
         // Wipe old state before setting new.  This is useful for e.g. updating a
@@ -211,12 +247,22 @@ class Object implements ArrayAccess
 
         // Get nested updates.
         foreach (self::$nestedUpdatableAttributes->toArray() as $property) {
-            if (isset($this->$property) && $this->$property instanceof Object) {
-                $params[$property] = $this->$property->serializeParameters();
+            if (isset($this->$property)) {
+                if ($this->$property instanceof StripeObject) {
+                    $serialized = $this->$property->serializeParameters();
+                    if ($serialized) {
+                        $params[$property] = $serialized;
+                    }
+                }
             }
         }
 
         return $params;
+    }
+
+    public function jsonSerialize()
+    {
+        return $this->__toArray(true);
     }
 
     public function __toJSON()
@@ -244,4 +290,4 @@ class Object implements ArrayAccess
     }
 }
 
-Object::init();
+StripeObject::init();
